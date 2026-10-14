@@ -4,11 +4,13 @@ build/
 **/build/
 local.properties
 
-# Bundled development tools — do not upload these
+# Bundled development tools ï¿½ do not upload these
 android-sdk/
 jdk17/
 tools/
+gradle/gradle-8.7/
 gradle/gradle-*-bin.zip
+*.log
 
 # IDE files
 .idea/
