@@ -1,0 +1,19 @@
+# Android build outputs
+.gradle/
+build/
+**/build/
+local.properties
+
+# Bundled development tools — do not upload these
+android-sdk/
+jdk17/
+tools/
+gradle/gradle-*-bin.zip
+
+# IDE files
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
