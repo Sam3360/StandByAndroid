@@ -16,6 +16,11 @@ A lightweight Android StandBy experience inspired by bedside display modes.
 - Android SDK 34
 - Android Studio or Gradle wrapper
 
+## Install the preview on Android
+Download the latest APK from the [GitHub Releases page](https://github.com/Sam3360/StandByAndroid/releases), open it on your phone, and approve installation from that source if Android asks.
+
+Preview APKs are debug-signed and intended for testing. Android may require allowing your browser or file manager to install unknown apps. Future builds signed with a different key cannot update this preview in place.
+
 ## Windows setup
 ```powershell
 cd C:\Users\samar\Downloads\android_apk
