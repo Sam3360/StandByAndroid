@@ -135,7 +135,7 @@ fun StandByScreen(
             if (uiState.settings.clockStyle == "analog") {
                 AnalogClockCard(uiState, accent)
             } else if (uiState.settings.clockStyle == "split") {
-                SplitFlapCard(uiState, accent, textColor)
+                SplitFlapCard(uiState, accent)
             } else {
                 DigitalClockCard(uiState, accent, textColor)
             }
@@ -215,7 +215,7 @@ private fun DigitalClockCard(uiState: StandByUiState, accent: Color, textColor: 
 }
 
 @Composable
-private fun SplitFlapCard(uiState: StandByUiState, accent: Color, textColor: Color) {
+private fun SplitFlapCard(uiState: StandByUiState, accent: Color) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -273,12 +273,15 @@ private fun AnalogClockCard(uiState: StandByUiState, accent: Color) {
                 drawCircle(color = Color(0xFF111C29), radius = size.minDimension / 2f, style = Stroke(width = 2.dp.toPx()))
                 for (i in 0..11) {
                     val angle = Math.toRadians((i * 30.0) - 90.0)
-                    val x = center.x + cos(angle.toDouble()) * 60f
-                    val y = center.y + sin(angle.toDouble()) * 60f
+                    val x = center.x + (cos(angle) * 60f).toFloat()
+                    val y = center.y + (sin(angle) * 60f).toFloat()
                     drawLine(
                         color = accent,
-                        start = Offset(center.x + cos(angle.toDouble()) * 70f, center.y + sin(angle.toDouble()) * 70f),
-                        end = Offset(x.toFloat(), y.toFloat()),
+                        start = Offset(
+                            center.x + (cos(angle) * 70f).toFloat(),
+                            center.y + (sin(angle) * 70f).toFloat()
+                        ),
+                        end = Offset(x, y),
                         strokeWidth = 2f
                     )
                 }
@@ -290,8 +293,8 @@ private fun AnalogClockCard(uiState: StandByUiState, accent: Color) {
                     color = accent,
                     start = Offset(center.x, center.y),
                     end = Offset(
-                        center.x + cos(hourAngle) * 40f,
-                        center.y + sin(hourAngle) * 40f
+                        center.x + (cos(hourAngle) * 40f).toFloat(),
+                        center.y + (sin(hourAngle) * 40f).toFloat()
                     ),
                     strokeWidth = 6f,
                     cap = StrokeCap.Round
@@ -300,8 +303,8 @@ private fun AnalogClockCard(uiState: StandByUiState, accent: Color) {
                     color = Color(0xFFB8D9FF),
                     start = Offset(center.x, center.y),
                     end = Offset(
-                        center.x + cos(minuteAngle) * 60f,
-                        center.y + sin(minuteAngle) * 60f
+                        center.x + (cos(minuteAngle) * 60f).toFloat(),
+                        center.y + (sin(minuteAngle) * 60f).toFloat()
                     ),
                     strokeWidth = 4f,
                     cap = StrokeCap.Round
@@ -310,8 +313,8 @@ private fun AnalogClockCard(uiState: StandByUiState, accent: Color) {
                     color = Color(0xFFEF5350),
                     start = Offset(center.x, center.y),
                     end = Offset(
-                        center.x + cos(secondAngle) * 70f,
-                        center.y + sin(secondAngle) * 70f
+                        center.x + (cos(secondAngle) * 70f).toFloat(),
+                        center.y + (sin(secondAngle) * 70f).toFloat()
                     ),
                     strokeWidth = 2f,
                     cap = StrokeCap.Round
@@ -454,6 +457,7 @@ private fun InfoCard(title: String, subtitle: String, icon: androidx.compose.ui.
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun SettingsSheet(
     uiState: StandByUiState,
     onDismiss: () -> Unit,

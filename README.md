@@ -5,9 +5,9 @@ A lightweight Android StandBy experience inspired by bedside display modes.
 ## Features
 - Full-screen digital, analog, and alternate clock layouts
 - Calendar event widget with optional permission flow
-- Photo slideshow with system picker
+- Photo slideshow with system picker and configurable automatic rotation
 - Battery and charging status
-- Night mode and dimming controls
+- Persistent night mode and screen-on controls
 - Persistent settings via DataStore
 - Responsive portrait/landscape layouts
 

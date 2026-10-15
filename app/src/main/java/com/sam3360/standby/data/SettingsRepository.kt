@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -25,23 +26,14 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun saveSettings(settings: StandBySettings) {
         context.dataStore.edit { prefs ->
-            prefs[StandBySettings.CLOCK_STYLE] = settings.clockStyle
-            prefs[StandBySettings.USE_24_HOUR] = settings.use24Hour
-            prefs[StandBySettings.DIMMING] = settings.dimming
-            prefs[StandBySettings.PHOTO_INTERVAL] = settings.photoIntervalSeconds
-            prefs[StandBySettings.KEEP_SCREEN_ON] = settings.keepScreenOn
-            prefs[StandBySettings.AUTO_ACTIVATE_MODE] = settings.autoActivateMode
-            prefs[StandBySettings.POWER_SAVE_MODE] = settings.powerSaveMode
-            prefs[StandBySettings.PHOTO_INDEX] = settings.photoIndex
-            prefs[StandBySettings.NIGHT_MODE] = settings.nightMode
-            prefs[StandBySettings.SHOW_SETTINGS] = settings.showSettings
+            prefs.writeSettings(settings)
         }
     }
 
     suspend fun updateSettings(mutator: (StandBySettings) -> StandBySettings) {
-        val current = getCurrentSettings()
-        val updated = mutator(current)
-        saveSettings(updated)
+        context.dataStore.edit { prefs ->
+            prefs.writeSettings(mutator(StandBySettings.fromPreferences(prefs)))
+        }
     }
 
     suspend fun getCurrentSettings(): StandBySettings {
@@ -51,10 +43,29 @@ class SettingsRepository(private val context: Context) {
     suspend fun setPhotoUris(uris: List<Uri>) {
         context.dataStore.edit { prefs ->
             prefs[PHOTO_URIS] = uris.map { it.toString() }.toSet()
+            val photoCount = uris.distinctBy { it.toString() }.size
+            prefs[StandBySettings.PHOTO_INDEX] = if (photoCount == 0) {
+                0
+            } else {
+                (prefs[StandBySettings.PHOTO_INDEX] ?: 0).coerceIn(0, photoCount - 1)
+            }
         }
     }
 
     companion object {
         val PHOTO_URIS = stringSetPreferencesKey("photo_uris")
     }
+}
+
+private fun MutablePreferences.writeSettings(settings: StandBySettings) {
+    this[StandBySettings.CLOCK_STYLE] = settings.clockStyle
+    this[StandBySettings.USE_24_HOUR] = settings.use24Hour
+    this[StandBySettings.DIMMING] = settings.dimming
+    this[StandBySettings.PHOTO_INTERVAL] = settings.photoIntervalSeconds
+    this[StandBySettings.KEEP_SCREEN_ON] = settings.keepScreenOn
+    this[StandBySettings.AUTO_ACTIVATE_MODE] = settings.autoActivateMode
+    this[StandBySettings.POWER_SAVE_MODE] = settings.powerSaveMode
+    this[StandBySettings.PHOTO_INDEX] = settings.photoIndex
+    this[StandBySettings.NIGHT_MODE] = settings.nightMode
+    this[StandBySettings.SHOW_SETTINGS] = settings.showSettings
 }

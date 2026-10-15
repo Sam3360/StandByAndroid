@@ -12,8 +12,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import android.view.WindowManager
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sam3360.standby.data.SettingsRepository
@@ -34,6 +36,16 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
+            DisposableEffect(state.settings.keepScreenOn) {
+                if (state.settings.keepScreenOn) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+                onDispose {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
             StandByTheme(darkTheme = true) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     StandByScreen(
