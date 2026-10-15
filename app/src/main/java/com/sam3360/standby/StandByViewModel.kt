@@ -1,7 +1,6 @@
 package com.sam3360.standby
 
 import android.Manifest
-import android.app.Activity
 import android.content.Context
 import android.net.Uri
 import android.os.BatteryManager
@@ -25,8 +24,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 
 class StandByViewModel(
-    private val appContext: Context,
-    private val activity: Activity
+    private val appContext: Context
 ) : ViewModel() {
 
     private val settingsRepository = SettingsRepository(appContext)
@@ -143,18 +141,6 @@ class StandByViewModel(
         }
     }
 
-    fun toggleAutoActivate() {
-        viewModelScope.launch {
-            val current = settingsRepository.getCurrentSettings()
-            val next = when (current.autoActivateMode) {
-                "manual" -> "charging"
-                "charging" -> "landscape"
-                else -> "manual"
-            }
-            settingsRepository.updateSettings { it.copy(autoActivateMode = next) }
-        }
-    }
-
     fun updateBattery(level: Int, scale: Int, status: Int) {
         val pct = if (level > -1 && scale > 0) (level * 100f / scale).toInt() else 0
         batteryFlow.value = StandByBatteryState(
@@ -163,9 +149,9 @@ class StandByViewModel(
         )
     }
 
-    fun onCalendarPermissionResult(granted: Boolean) {
+    fun onCalendarPermissionResult(granted: Boolean, context: Context) {
         if (granted) {
-            loadCalendarEvents(activity)
+            loadCalendarEvents(context)
         }
     }
 
@@ -192,10 +178,10 @@ class StandByViewModel(
         }
     }
 
-    fun loadCalendarEvents(activity: Activity) {
+    fun loadCalendarEvents(context: Context) {
         viewModelScope.launch {
             val hasPermission = ContextCompat.checkSelfPermission(
-                activity,
+                context,
                 Manifest.permission.READ_CALENDAR
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
             if (!hasPermission) {
@@ -213,7 +199,7 @@ class StandByViewModel(
                 val now = System.currentTimeMillis()
                 val end = now + 1000L * 60L * 60L * 24L * 30L
                 val cursor = CalendarContract.Instances.query(
-                    activity.contentResolver,
+                    context.contentResolver,
                     projection,
                     now,
                     end,

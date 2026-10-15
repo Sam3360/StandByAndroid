@@ -19,10 +19,21 @@ The available APK is a debug-signed preview for testing, not a production or Goo
 
 - Full-screen digital, analog, and split-flap-inspired clocks
 - Battery level and charging status
+- Optional Android screen saver mode for a charging bedside display
 - Optional upcoming calendar events
 - Photo selection and configurable automatic slideshow
 - Persistent clock, night mode, and screen-on settings
 - Portrait and landscape layouts
+
+## Use StandBy while charging
+
+Android starts screen savers while a device is idle, so StandBy may not appear immediately when you connect a charger. To enable it:
+
+1. Open StandBy and tap **Settings** > **Set up charging screen**.
+2. Choose **StandBy** in Android's screen saver settings.
+3. Select **While charging** (wording and menu location can vary by phone).
+
+The phone must be charging and Android must decide it is idle before the screen saver starts. Some manufacturers customize or disable screen saver controls; in that case, use StandBy manually from the app.
 
 ## Build from source
 

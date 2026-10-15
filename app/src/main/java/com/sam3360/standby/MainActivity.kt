@@ -4,9 +4,13 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.ActivityNotFoundException
 import android.content.pm.PackageManager
 import android.os.BatteryManager
 import android.os.Bundle
+import android.provider.Settings
+import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,7 +19,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import android.view.WindowManager
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sam3360.standby.data.SettingsRepository
@@ -23,12 +26,21 @@ import com.sam3360.standby.ui.StandByScreen
 import com.sam3360.standby.ui.theme.StandByTheme
 
 class MainActivity : ComponentActivity() {
-    private val viewModel by lazy { StandByViewModel(applicationContext, this) }
+    private val viewModel by lazy { StandByViewModel(applicationContext) }
+    private var batteryReceiverRegistered = false
+    private val batteryReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            viewModel.updateBattery(level, scale, status)
+        }
+    }
 
     private val calendarPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        viewModel.onCalendarPermissionResult(granted)
+        viewModel.onCalendarPermissionResult(granted, this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,7 +81,7 @@ class MainActivity : ComponentActivity() {
                         onPhotoPick = { uris -> viewModel.setPhotoSelection(uris) },
                         onNextPhoto = { viewModel.nextPhoto() },
                         onPreviousPhoto = { viewModel.previousPhoto() },
-                        onToggleAuto = { viewModel.toggleAutoActivate() },
+                        onSetupChargingMode = ::openDreamSettings,
                         onUpdatePhotoInterval = { viewModel.updatePhotoInterval(it) },
                         onToggleKeepScreenOn = { viewModel.setKeepScreenOn(!state.settings.keepScreenOn) }
                     )
@@ -77,19 +89,34 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        registerBatteryReceiver()
         viewModel.loadCalendarEvents(this)
     }
 
-    private fun registerBatteryReceiver() {
-        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        registerReceiver(object : android.content.BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-                viewModel.updateBattery(level, scale, status)
-            }
-        }, filter)
+    override fun onStart() {
+        super.onStart()
+        if (!batteryReceiverRegistered) {
+            registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            batteryReceiverRegistered = true
+        }
+    }
+
+    override fun onStop() {
+        if (batteryReceiverRegistered) {
+            unregisterReceiver(batteryReceiver)
+            batteryReceiverRegistered = false
+        }
+        super.onStop()
+    }
+
+    private fun openDreamSettings() {
+        try {
+            startActivity(Intent(Settings.ACTION_DREAM_SETTINGS))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(
+                this,
+                "Open system Settings > Display > Screen saver to enable StandBy.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 }
