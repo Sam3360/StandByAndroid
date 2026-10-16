@@ -13,7 +13,7 @@ StandBy requires Android 8.0 (API 26) or newer. Calendar events are optional; gr
 
 ### About preview builds
 
-The available APK is a debug-signed preview for testing, not a production or Google Play release. Android treats APKs signed with different keys as different apps for updates. If a future version cannot install over this preview, uninstall the preview first and then install the newer APK. Uninstalling removes the app's saved settings.
+Preview APKs are debug-signed and intended for testing, not production or Google Play. The first production-signed version will use a different, persistent key, so uninstall any preview first; uninstalling removes saved settings. Future production releases can update in place as long as the production signing key is preserved.
 
 ## Features
 
@@ -77,3 +77,15 @@ The debug APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 ```sh
 ./gradlew testDebugUnitTest
 ```
+
+## Build a production APK
+
+The production APK must be signed with a long-lived private key. On Windows, run:
+
+```powershell
+.\scripts\build-production-release.ps1
+```
+
+On its first run, the script asks `keytool` to create `standby-release.keystore` in the project root and prompts for passwords without placing them in source code. Keep a secure offline backup of this keystore and its passwords. Losing them prevents future production updates from installing over this release. The keystore is ignored by Git.
+
+The signed APK is created at `app/build/outputs/apk/release/app-release.apk`. Verify it on physical devices before publishing it as a production release.

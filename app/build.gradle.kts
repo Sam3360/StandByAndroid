@@ -3,6 +3,17 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val releaseStoreFile = providers.environmentVariable("STANDBY_RELEASE_STORE_FILE").orNull
+val releaseStorePassword = providers.environmentVariable("STANDBY_RELEASE_STORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("STANDBY_RELEASE_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("STANDBY_RELEASE_KEY_PASSWORD").orNull
+val releaseSigningConfigured = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.sam3360.standby"
     compileSdk = 34
@@ -11,8 +22,8 @@ android {
         applicationId = "com.sam3360.standby"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -22,6 +33,14 @@ android {
 
     buildTypes {
         release {
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.create("production") {
+                    storeFile = file(requireNotNull(releaseStoreFile))
+                    storePassword = requireNotNull(releaseStorePassword)
+                    keyAlias = requireNotNull(releaseKeyAlias)
+                    keyPassword = requireNotNull(releaseKeyPassword)
+                }
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -51,6 +70,23 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+val verifyReleaseSigning = tasks.register("verifyReleaseSigning") {
+    doLast {
+        check(releaseSigningConfigured) {
+            "Release signing is not configured. Run scripts/build-production-release.ps1 to generate or use a local signing key."
+        }
+        check(file(requireNotNull(releaseStoreFile)).isFile) {
+            "Release keystore not found: $releaseStoreFile"
+        }
+    }
+}
+
+tasks.configureEach {
+    if (name == "preReleaseBuild") {
+        dependsOn(verifyReleaseSigning)
     }
 }
 

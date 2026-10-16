@@ -11,6 +11,8 @@ tools/
 gradle/gradle-8.7/
 gradle/gradle-*-bin.zip
 *.log
+*.keystore
+*.jks
 
 # IDE files
 .idea/
