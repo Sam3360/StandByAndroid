@@ -25,6 +25,9 @@ class StandByLogicTest {
     fun `battery percentage is calculated correctly`() {
         assertEquals(50, StandByLogic.batteryPercent(50, 100))
         assertEquals(25, StandByLogic.batteryPercent(1, 4))
+        assertEquals(100, StandByLogic.batteryPercent(150, 100))
+        assertEquals(0, StandByLogic.batteryPercent(-1, 100))
+        assertEquals(0, StandByLogic.batteryPercent(10, 0))
     }
 
     @Test

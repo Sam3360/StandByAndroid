@@ -6,6 +6,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.sam3360.standby.model.StandBySettings
@@ -21,7 +22,10 @@ class SettingsRepository(private val context: Context) {
     }
 
     val photoUrisFlow: Flow<List<Uri>> = context.dataStore.data.map { prefs ->
-        (prefs[PHOTO_URIS] ?: emptySet()).map { Uri.parse(it) }
+        val orderedUris = prefs[PHOTO_URIS_ORDERED]
+        val storedUris = orderedUris?.split('\n')?.filter(String::isNotBlank)
+            ?: (prefs[PHOTO_URIS] ?: emptySet()).sorted()
+        storedUris.map(Uri::parse)
     }
 
     suspend fun saveSettings(settings: StandBySettings) {
@@ -42,8 +46,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setPhotoUris(uris: List<Uri>) {
         context.dataStore.edit { prefs ->
-            prefs[PHOTO_URIS] = uris.map { it.toString() }.toSet()
-            val photoCount = uris.distinctBy { it.toString() }.size
+            val uniqueUris = uris.distinctBy(Uri::toString)
+            prefs[PHOTO_URIS] = uniqueUris.map(Uri::toString).toSet()
+            prefs[PHOTO_URIS_ORDERED] = uniqueUris.joinToString("\n") { it.toString() }
+            val photoCount = uniqueUris.size
             prefs[StandBySettings.PHOTO_INDEX] = if (photoCount == 0) {
                 0
             } else {
@@ -54,6 +60,7 @@ class SettingsRepository(private val context: Context) {
 
     companion object {
         val PHOTO_URIS = stringSetPreferencesKey("photo_uris")
+        private val PHOTO_URIS_ORDERED = stringPreferencesKey("photo_uris_ordered")
     }
 }
 

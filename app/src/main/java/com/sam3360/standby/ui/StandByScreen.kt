@@ -1,19 +1,11 @@
 package com.sam3360.standby.ui
 
-import android.app.Activity
 import android.net.Uri
 import android.os.BatteryManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -22,10 +14,12 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,6 +28,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.NavigateBefore
+import androidx.compose.material.icons.automirrored.filled.NavigateNext
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.NightsStay
@@ -41,46 +38,53 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.sam3360.standby.model.CalendarEvent
 import com.sam3360.standby.model.StandByUiState
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.sin
+
+private val ScreenBackground = Color(0xFF08090D)
+private val CardBackground = Color(0xFF15161D)
+private val MutedText = Color(0xFFA5A4AF)
+private val Lavender = Color(0xFFC9B9FF)
+private val NightAccent = Color(0xFFFF9A8B)
 
 @Composable
 fun StandByScreen(
     uiState: StandByUiState,
     onToggleSettings: () -> Unit,
     onToggleNightMode: () -> Unit,
-    onTogglePowerSave: () -> Unit,
     onClockStyleChange: (String) -> Unit,
     onToggle24Hour: () -> Unit,
     onRequestCalendarPermission: () -> Unit,
@@ -91,485 +95,544 @@ fun StandByScreen(
     onUpdatePhotoInterval: (Int) -> Unit,
     onToggleKeepScreenOn: () -> Unit
 ) {
-    val accent = if (uiState.nightMode) Color(0xFFFF6B72) else Color(0xFFB9A7FF)
-    val background = if (uiState.nightMode) Color(0xFF10090B) else Color(0xFF08080B)
-    val textColor = if (uiState.nightMode) Color(0xFFFFE8E8) else Color(0xFFF4F1FA)
+    val accent = if (uiState.nightMode) NightAccent else Lavender
+    val textColor = Color(0xFFF3F1F7)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    listOf(background, if (uiState.nightMode) Color(0xFF190B0D) else Color(0xFF111018))
+                    colors = if (uiState.nightMode) {
+                        listOf(Color(0xFF1A1012), Color(0xFF100B0D), ScreenBackground)
+                    } else {
+                        listOf(Color(0xFF111118), ScreenBackground, ScreenBackground)
+                    }
                 )
             )
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val landscape = maxWidth > maxHeight
-            val availableHeight = maxHeight
-            if (landscape) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 34.dp, vertical = 22.dp),
-                    horizontalArrangement = Arrangement.spacedBy(38.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .weight(0.94f)
-                            .fillMaxHeight(),
-                        verticalArrangement = Arrangement.SpaceBetween
+            val availableHeight = maxHeight.value
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = if (landscape) 28.dp else 22.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(if (landscape) 14.dp else 18.dp)
+            ) {
+                Header(
+                    accent = accent,
+                    onNightMode = onToggleNightMode,
+                    onSettings = onToggleSettings
+                )
+
+                if (landscape) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(26.dp)
                     ) {
-                        HeaderActions(accent, textColor, onToggleNightMode, onToggleSettings)
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ClockFace(
-                                uiState,
-                                accent,
-                                textColor,
-                                (availableHeight.value * 0.29f).coerceIn(54f, 104f).sp,
-                                compact = true
-                            )
-                            Text(
-                                text = formatDate(uiState.currentDate),
-                                color = textColor.copy(alpha = 0.62f),
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Medium
-                            )
+                        Column(
+                            modifier = Modifier
+                                .weight(0.94f)
+                                .fillMaxHeight(),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            ClockPanel(uiState, textColor, availableHeight, landscape = true)
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                BatteryTile(
+                                    level = uiState.batteryLevel,
+                                    state = uiState.chargingState,
+                                    accent = accent,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                ChargingSetupTile(
+                                    accent = accent,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = onSetupChargingMode
+                                )
+                            }
                         }
-                        BatterySummary(uiState, accent, textColor)
+                        Column(
+                            modifier = Modifier
+                                .weight(1.06f)
+                                .fillMaxHeight(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            PhotoCard(
+                                uiState = uiState,
+                                accent = accent,
+                                onPhotoPick = onPhotoPick,
+                                onNextPhoto = onNextPhoto,
+                                onPreviousPhoto = onPreviousPhoto,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (uiState.upcomingEvents.isNotEmpty()) {
+                                UpcomingEventTile(uiState.upcomingEvents.first(), accent)
+                            } else {
+                                CalendarHintTile(accent, onRequestCalendarPermission)
+                            }
+                        }
                     }
+                } else {
                     Column(
                         modifier = Modifier
-                            .weight(1.06f)
-                            .fillMaxHeight(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(18.dp)
                     ) {
-                        PhotoSlideshowCard(
-                            uiState,
-                            accent,
-                            textColor,
-                            onPhotoPick,
-                            onNextPhoto,
-                            onPreviousPhoto,
-                            height = availableHeight * 0.53f
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            InfoCard(
-                                title = "Charging setup",
-                                subtitle = "Screen saver",
-                                icon = Icons.Default.BatteryChargingFull,
-                                accent = accent,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable(onClick = onSetupChargingMode)
-                            )
-                            InfoCard(
-                                title = "Up next",
-                                subtitle = uiState.upcomingEvents.firstOrNull()?.title ?: "No upcoming events",
-                                icon = Icons.Default.Event,
+                        ClockPanel(uiState, textColor, availableHeight, landscape = false)
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            BatteryTile(
+                                level = uiState.batteryLevel,
+                                state = uiState.chargingState,
                                 accent = accent,
                                 modifier = Modifier.weight(1f)
                             )
+                            ChargingSetupTile(
+                                accent = accent,
+                                modifier = Modifier.weight(1f),
+                                onClick = onSetupChargingMode
+                            )
+                        }
+                        uiState.upcomingEvents.firstOrNull()?.let {
+                            UpcomingEventTile(it, accent)
+                        }
+                        PhotoCard(
+                            uiState = uiState,
+                            accent = accent,
+                            onPhotoPick = onPhotoPick,
+                            onNextPhoto = onNextPhoto,
+                            onPreviousPhoto = onPreviousPhoto,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1.55f)
+                        )
+                        if (uiState.upcomingEvents.isEmpty()) {
+                            CalendarHintTile(accent, onRequestCalendarPermission)
                         }
                     }
                 }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 22.dp, vertical = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
-                ) {
-                    HeaderActions(accent, textColor, onToggleNightMode, onToggleSettings)
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        ClockFace(uiState, accent, textColor, 78.sp)
-                        Text(
-                            text = formatDate(uiState.currentDate),
-                            color = textColor.copy(alpha = 0.62f),
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        InfoCard(
-                            title = "Battery",
-                            subtitle = "${uiState.batteryLevel}% · ${chargingStateLabel(uiState.chargingState)}",
-                            icon = Icons.Default.BatteryChargingFull,
-                            accent = accent,
-                            modifier = Modifier.weight(1f)
-                        )
-                        InfoCard(
-                            title = "Charging setup",
-                            subtitle = "Screen saver",
-                            icon = Icons.Default.Timer,
-                            accent = accent,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable(onClick = onSetupChargingMode)
-                        )
-                    }
-                    if (uiState.upcomingEvents.isNotEmpty()) {
-                        EventCard(uiState.upcomingEvents, accent, textColor)
-                    } else {
-                        EventCardEmpty { onRequestCalendarPermission() }
-                    }
-                    PhotoSlideshowCard(
-                        uiState,
-                        accent,
-                        textColor,
-                        onPhotoPick,
-                        onNextPhoto,
-                        onPreviousPhoto
-                    )
-                }
             }
+        }
 
-            if (uiState.showSettings) {
-                SettingsSheet(
-                    uiState = uiState,
-                    onDismiss = onToggleSettings,
-                    onToggle24Hour = onToggle24Hour,
-                    onToggleNightMode = onToggleNightMode,
-                    onTogglePowerSave = onTogglePowerSave,
-                    onClockStyleChange = onClockStyleChange,
-                    onSetupChargingMode = onSetupChargingMode,
-                    onUpdatePhotoInterval = onUpdatePhotoInterval,
-                    onToggleKeepScreenOn = onToggleKeepScreenOn,
-                    onRequestCalendarPermission = onRequestCalendarPermission
-                )
-            }
+        if (uiState.showSettings) {
+            SettingsSheet(
+                uiState = uiState,
+                onDismiss = onToggleSettings,
+                onToggle24Hour = onToggle24Hour,
+                onToggleNightMode = onToggleNightMode,
+                onClockStyleChange = onClockStyleChange,
+                onSetupChargingMode = onSetupChargingMode,
+                onUpdatePhotoInterval = onUpdatePhotoInterval,
+                onToggleKeepScreenOn = onToggleKeepScreenOn,
+                onRequestCalendarPermission = onRequestCalendarPermission
+            )
         }
     }
 }
 
 @Composable
-private fun HeaderActions(
-    accent: Color,
-    textColor: Color,
-    onToggleNightMode: () -> Unit,
-    onToggleSettings: () -> Unit
-) {
+private fun Header(accent: Color, onNightMode: () -> Unit, onSettings: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("STANDBY", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-            Text("A calmer bedside", color = textColor.copy(alpha = 0.55f), fontSize = 12.sp)
+            Text(
+                text = "standby",
+                color = Color(0xFFF5F2FA),
+                fontSize = 21.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-0.5).sp
+            )
+            Text("Your bedside, at a glance", color = MutedText, fontSize = 12.sp)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            IconButtonWithLabel(icon = Icons.Default.NightsStay, label = "Night", onClick = onToggleNightMode)
-            IconButtonWithLabel(icon = Icons.Default.Settings, label = "Settings", onClick = onToggleSettings)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onNightMode) {
+                Icon(
+                    imageVector = Icons.Default.NightsStay,
+                    contentDescription = "Toggle night mode",
+                    tint = accent
+                )
+            }
+            IconButton(onClick = onSettings) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Open settings",
+                    tint = Color(0xFFE1DFE8)
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ClockFace(
+private fun ClockPanel(
     uiState: StandByUiState,
-    accent: Color,
     textColor: Color,
-    fontSize: androidx.compose.ui.unit.TextUnit,
-    compact: Boolean = false
+    availableHeight: Float,
+    landscape: Boolean
 ) {
-    when (uiState.settings.clockStyle) {
-        "analog" -> AnalogClockCard(uiState, accent, compact)
-        "split" -> SplitFlapCard(uiState, accent, compact)
-        else -> Text(
-            text = formatTime(uiState.currentTime, uiState.settings.use24Hour),
-            color = textColor,
-            fontSize = fontSize,
-            fontWeight = FontWeight.Light,
-            letterSpacing = (-3).sp,
-            lineHeight = fontSize
-        )
-    }
-}
-
-@Composable
-private fun BatterySummary(uiState: StandByUiState, accent: Color, textColor: Color) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(9.dp)
-    ) {
-        Icon(Icons.Default.BatteryChargingFull, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
-        Text(
-            "${uiState.batteryLevel}%  ${chargingStateLabel(uiState.chargingState)}",
-            color = textColor.copy(alpha = 0.72f),
-            fontSize = 14.sp
-        )
-    }
-}
-
-@Composable
-private fun DigitalClockCard(uiState: StandByUiState, accent: Color, textColor: Color) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF0C1622).copy(alpha = 0.78f))
-                .padding(26.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = formatTime(uiState.currentTime, uiState.settings.use24Hour),
-                color = accent,
-                fontSize = 54.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = formatDate(uiState.currentDate),
-                color = textColor.copy(alpha = 0.75f),
-                fontSize = 18.sp
-            )
-        }
-    }
-}
-
-@Composable
-private fun SplitFlapCard(uiState: StandByUiState, accent: Color, compact: Boolean = false) {
-    Card(
+    val accent = if (uiState.nightMode) NightAccent else Lavender
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (compact) 130.dp else 180.dp),
-        shape = RoundedCornerShape(24.dp)
+            .padding(vertical = if (landscape) 4.dp else 10.dp),
+        horizontalAlignment = if (landscape) Alignment.Start else Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFF101720))
-                .padding(if (compact) 12.dp else 20.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp)) {
-                repeat(4) { index ->
-                    Box(
-                        modifier = Modifier
-                            .size(if (compact) 44.dp else 56.dp, if (compact) 72.dp else 90.dp)
-                            .background(Color(0xFF1E2B38))
-                            .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
+        when (uiState.settings.clockStyle) {
+            "analog" -> AnalogClock(
+                time = uiState.currentTime,
+                accent = accent,
+                modifier = Modifier
+                    .size(if (landscape) (availableHeight * 0.34f).coerceIn(120f, 190f).dp else 190.dp)
+                    .align(if (landscape) Alignment.Start else Alignment.CenterHorizontally)
+            )
+            "split" -> SplitClock(
+                uiState.currentTime,
+                uiState.settings.use24Hour,
+                textColor,
+                accent
+            )
+            else -> {
+                val clockSize = if (landscape) {
+                    (availableHeight * 0.32f).coerceIn(54f, 104f).sp
+                } else {
+                    82.sp
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = if (landscape) Arrangement.Start else Arrangement.Center,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    Text(
+                        text = formatTime(uiState.currentTime, uiState.settings.use24Hour),
+                        color = textColor,
+                        fontSize = clockSize,
+                        fontWeight = FontWeight.Light,
+                        fontFamily = FontFamily.SansSerif,
+                        letterSpacing = (-3).sp,
+                        lineHeight = clockSize,
+                        maxLines = 1
+                    )
+                    if (!uiState.settings.use24Hour) {
                         Text(
-                            text = when (index) {
-                                0 -> formatTime(uiState.currentTime, uiState.settings.use24Hour).substringBefore(":").padStart(2, '0').take(2)
-                                1 -> formatTime(uiState.currentTime, uiState.settings.use24Hour).substringAfter(":").substringBefore(" ").padStart(2, '0')
-                                else -> if (index == 2) "S" else " "
-                            },
-                            color = accent,
-                            fontSize = if (compact) 22.sp else 28.sp,
-                            fontWeight = FontWeight.Bold
+                            text = if (uiState.currentTime.hour < 12) "AM" else "PM",
+                            modifier = Modifier.padding(start = 8.dp, bottom = 11.dp),
+                            color = MutedText,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
             }
         }
+        Text(
+            text = formatDate(uiState.currentDate),
+            color = MutedText,
+            fontSize = if (landscape) 16.sp else 17.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
 @Composable
-private fun AnalogClockCard(uiState: StandByUiState, accent: Color, compact: Boolean = false) {
-    Card(shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(if (compact) 172.dp else 230.dp)
-                .padding(if (compact) 8.dp else 18.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            val seconds = uiState.currentTime.second.toFloat()
-            val minutes = uiState.currentTime.minute.toFloat() + seconds / 60f
-            val hours = (uiState.currentTime.hour % 12).toFloat() + minutes / 60f
-            Canvas(modifier = Modifier.size(if (compact) 150.dp else 180.dp)) {
-                drawCircle(color = Color(0xFF111C29), radius = size.minDimension / 2f, style = Stroke(width = 2.dp.toPx()))
-                for (i in 0..11) {
-                    val angle = Math.toRadians((i * 30.0) - 90.0)
-                    val x = center.x + (cos(angle) * 60f).toFloat()
-                    val y = center.y + (sin(angle) * 60f).toFloat()
-                    drawLine(
-                        color = accent,
-                        start = Offset(
-                            center.x + (cos(angle) * 70f).toFloat(),
-                            center.y + (sin(angle) * 70f).toFloat()
-                        ),
-                        end = Offset(x, y),
-                        strokeWidth = 2f
-                    )
-                }
-                val hourAngle = Math.toRadians((hours * 30.0) - 90.0)
-                val minuteAngle = Math.toRadians((minutes * 6.0) - 90.0)
-                val secondAngle = Math.toRadians((seconds * 6.0) - 90.0)
-
-                drawLine(
-                    color = accent,
-                    start = Offset(center.x, center.y),
-                    end = Offset(
-                        center.x + (cos(hourAngle) * 40f).toFloat(),
-                        center.y + (sin(hourAngle) * 40f).toFloat()
-                    ),
-                    strokeWidth = 6f,
-                    cap = StrokeCap.Round
-                )
-                drawLine(
-                    color = Color(0xFFB8D9FF),
-                    start = Offset(center.x, center.y),
-                    end = Offset(
-                        center.x + (cos(minuteAngle) * 60f).toFloat(),
-                        center.y + (sin(minuteAngle) * 60f).toFloat()
-                    ),
-                    strokeWidth = 4f,
-                    cap = StrokeCap.Round
-                )
-                drawLine(
-                    color = Color(0xFFEF5350),
-                    start = Offset(center.x, center.y),
-                    end = Offset(
-                        center.x + (cos(secondAngle) * 70f).toFloat(),
-                        center.y + (sin(secondAngle) * 70f).toFloat()
-                    ),
-                    strokeWidth = 2f,
-                    cap = StrokeCap.Round
-                )
-                drawCircle(color = accent, radius = 8f)
-            }
-        }
-    }
-}
-
-@Composable
-private fun EventCard(events: List<com.sam3360.standby.model.CalendarEvent>, accent: Color, textColor: Color) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp)
+private fun SplitClock(time: LocalDateTime, use24Hour: Boolean, textColor: Color, accent: Color) {
+    val hour = if (use24Hour) time.hour else time.hour % 12.let { if (it == 0) 12 else it }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF0C1420))
-                .padding(18.dp)
-        ) {
-            Text(text = "Upcoming", color = accent, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            events.take(3).forEach { event ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(Icons.Default.Event, contentDescription = null, tint = accent)
-                    Column {
-                        Text(event.title, color = textColor, fontWeight = FontWeight.SemiBold)
-                        val time = java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM • HH:mm")
-                            .format(java.time.Instant.ofEpochMilli(event.startTimeMillis).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime())
-                        Text(time, color = textColor.copy(alpha = 0.7f), fontSize = 12.sp)
-                        event.location?.let {
-                            Text(it, color = textColor.copy(alpha = 0.65f), fontSize = 12.sp)
-                        }
-                    }
-                }
+        SplitDigitPair(hour.toString().padStart(2, '0'), textColor)
+        Text(":", color = accent, fontSize = 40.sp, fontWeight = FontWeight.Light)
+        SplitDigitPair(time.minute.toString().padStart(2, '0'), textColor)
+        if (!use24Hour) {
+            Text(if (time.hour < 12) "AM" else "PM", color = MutedText, fontSize = 13.sp)
+        }
+    }
+}
+
+@Composable
+private fun SplitDigitPair(value: String, textColor: Color) {
+    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        value.forEach { digit ->
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFF20212A)
+            ) {
+                Text(
+                    text = digit.toString(),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    color = textColor,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = FontFamily.Monospace
+                )
             }
         }
     }
 }
 
 @Composable
-private fun EventCardEmpty(onRequestCalendarPermission: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp)
+private fun AnalogClock(time: LocalDateTime, accent: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val radius = size.minDimension * 0.46f
+        val tickInner = radius * 0.88f
+        drawCircle(
+            color = Color(0xFF292833),
+            radius = radius,
+            style = Stroke(width = size.minDimension * 0.012f)
+        )
+        for (index in 0 until 60) {
+            val angle = Math.toRadians(index * 6.0 - 90.0)
+            val major = index % 5 == 0
+            val inner = if (major) tickInner else radius * 0.94f
+            drawLine(
+                color = if (major) accent.copy(alpha = 0.85f) else Color(0xFF666471),
+                start = Offset(
+                    center.x + (cos(angle) * inner).toFloat(),
+                    center.y + (sin(angle) * inner).toFloat()
+                ),
+                end = Offset(
+                    center.x + (cos(angle) * radius).toFloat(),
+                    center.y + (sin(angle) * radius).toFloat()
+                ),
+                strokeWidth = if (major) size.minDimension * 0.014f else size.minDimension * 0.006f,
+                cap = StrokeCap.Round
+            )
+        }
+        val minuteValue = time.minute + time.second / 60f
+        val hourValue = time.hour % 12 + minuteValue / 60f
+        drawClockHand(hourValue / 12f, radius * 0.52f, size.minDimension * 0.035f, accent)
+        drawClockHand(minuteValue / 60f, radius * 0.75f, size.minDimension * 0.022f, Color(0xFFE8E4F1))
+        drawCircle(color = accent, radius = size.minDimension * 0.035f)
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawClockHand(
+    fraction: Float,
+    handLength: Float,
+    strokeWidth: Float,
+    color: Color
+) {
+    val angle = Math.toRadians(fraction * 360.0 - 90.0)
+    drawLine(
+        color = color,
+        start = center,
+        end = Offset(
+            center.x + (cos(angle) * handLength).toFloat(),
+            center.y + (sin(angle) * handLength).toFloat()
+        ),
+        strokeWidth = strokeWidth,
+        cap = StrokeCap.Round
+    )
+}
+
+@Composable
+private fun BatteryTile(
+    level: Int,
+    state: Int,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(20.dp), color = CardBackground) {
+        Row(
+            modifier = Modifier.padding(horizontal = 15.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(Icons.Default.BatteryChargingFull, contentDescription = null, tint = accent)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("$level%", color = Color(0xFFF3F1F7), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                Text(chargingStateLabel(state), color = MutedText, fontSize = 12.sp, maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChargingSetupTile(
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        color = CardBackground
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF0C1420))
-                .padding(18.dp)
+        Row(
+            modifier = Modifier.padding(horizontal = 15.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Upcoming events", color = Color(0xFF7EC8FF), fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            Text("No calendar access yet. Enable event access to show upcoming items.", color = Color.White.copy(alpha = 0.7f))
-            Spacer(Modifier.height(12.dp))
-            Button(onClick = onRequestCalendarPermission) {
-                Text("Enable calendar access")
+            Icon(Icons.Default.Timer, contentDescription = null, tint = accent)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Charging mode", color = Color(0xFFF3F1F7), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text("Set up screen saver", color = MutedText, fontSize = 11.sp, maxLines = 1)
             }
         }
     }
 }
 
 @Composable
-private fun PhotoSlideshowCard(
+private fun PhotoCard(
     uiState: StandByUiState,
     accent: Color,
-    textColor: Color,
     onPhotoPick: (List<Uri>) -> Unit,
     onNextPhoto: () -> Unit,
     onPreviousPhoto: () -> Unit,
-    height: androidx.compose.ui.unit.Dp = 220.dp
+    modifier: Modifier = Modifier
 ) {
     val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
-    ) { uris -> if (uris.isNotEmpty()) onPhotoPick(uris) }
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
-        Box(modifier = Modifier.height(height).fillMaxWidth().background(Color(0xFF0B1220))) {
-            val currentPhoto = uiState.selectedPhotos.getOrNull(uiState.settings.photoIndex)
-            if (currentPhoto != null) {
-                AsyncImage(
-                    model = currentPhoto,
-                    contentDescription = "StandBy photo",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = accent, modifier = Modifier.size(28.dp))
-                    Spacer(Modifier.height(8.dp))
-                    Text("No photos selected", color = textColor)
-                    Spacer(Modifier.height(8.dp))
-                    Button(onClick = { photoPicker.launch("image/*") }) {
-                        Text("Select photos")
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) onPhotoPick(uris)
+    }
+    val currentPhoto = uiState.selectedPhotos.getOrNull(uiState.settings.photoIndex)
+    val surfaceShape = RoundedCornerShape(26.dp)
+
+    Box(
+        modifier = modifier
+            .clip(surfaceShape)
+            .background(Color(0xFF171720))
+    ) {
+        if (currentPhoto != null) {
+            AsyncImage(
+                model = currentPhoto,
+                contentDescription = "Selected bedside photo",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(
+                            Brush.verticalGradient(
+                                0f to Color.Black.copy(alpha = 0.30f),
+                                0.38f to Color.Transparent,
+                                1f to Color.Black.copy(alpha = 0.62f)
+                            )
+                        )
                     }
-                }
-            }
+            )
+            Text(
+                text = "YOUR PHOTOS",
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(18.dp),
+                color = Color.White.copy(alpha = 0.9f),
+                fontSize = 11.sp,
+                letterSpacing = 1.5.sp,
+                fontWeight = FontWeight.SemiBold
+            )
             Row(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
+                    .align(Alignment.BottomStart)
                     .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                OutlinedButton(onClick = { onPreviousPhoto() }) { Text("Prev") }
-                OutlinedButton(onClick = { onNextPhoto() }) { Text("Next") }
-                OutlinedButton(onClick = { photoPicker.launch("image/*") }) { Text("Add") }
+                PhotoControl("Previous photo", Icons.AutoMirrored.Filled.NavigateBefore, onPreviousPhoto)
+                PhotoControl("Next photo", Icons.AutoMirrored.Filled.NavigateNext, onNextPhoto)
+                PhotoControl("Add photos", Icons.Default.Add) {
+                    photoPicker.launch(arrayOf("image/*"))
+                }
+                Text(
+                    text = "${uiState.settings.photoIndex + 1} / ${uiState.selectedPhotos.size}",
+                    modifier = Modifier.padding(start = 4.dp),
+                    color = Color.White.copy(alpha = 0.84f),
+                    fontSize = 12.sp
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { photoPicker.launch(arrayOf("image/*")) }
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Surface(shape = CircleShape, color = Color(0xFF24232E)) {
+                    Icon(
+                        Icons.Default.PhotoLibrary,
+                        contentDescription = null,
+                        modifier = Modifier.padding(13.dp).size(25.dp),
+                        tint = accent
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Make it yours", color = Color(0xFFF3F1F7), fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(4.dp))
+                Text("Choose photos for your bedside display", color = MutedText, fontSize = 12.sp)
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { photoPicker.launch(arrayOf("image/*")) }) {
+                    Text("Choose photos")
+                }
             }
         }
     }
 }
 
 @Composable
-private fun InfoCard(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, accent: Color, modifier: Modifier = Modifier) {
-    Card(modifier = modifier, shape = RoundedCornerShape(18.dp)) {
-        Column(
+private fun PhotoControl(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    IconButton(onClick = onClick) {
+        Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.36f)) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(38.dp)) {
+                Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(22.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpcomingEventTile(event: CalendarEvent, accent: Color) {
+    Surface(shape = RoundedCornerShape(20.dp), color = CardBackground) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF0D1520))
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, tint = accent)
-                Spacer(Modifier.width(8.dp))
-                Text(title, color = accent, fontWeight = FontWeight.Bold)
+            Icon(Icons.Default.Event, contentDescription = null, tint = accent)
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("UP NEXT", color = accent, fontSize = 10.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.SemiBold)
+                Text(event.title, color = Color(0xFFF3F1F7), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(formatEventTime(event.startTimeMillis), color = MutedText, fontSize = 11.sp)
             }
-            Spacer(Modifier.height(8.dp))
-            Text(subtitle, color = Color.White.copy(alpha = 0.8f))
+        }
+    }
+}
+
+@Composable
+private fun CalendarHintTile(accent: Color, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        color = CardBackground
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(Icons.Default.Event, contentDescription = null, tint = accent)
+            Column {
+                Text("Add your calendar", color = Color(0xFFF3F1F7), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text("Show your next event here", color = MutedText, fontSize = 11.sp)
+            }
         }
     }
 }
@@ -581,7 +644,6 @@ private fun SettingsSheet(
     onDismiss: () -> Unit,
     onToggle24Hour: () -> Unit,
     onToggleNightMode: () -> Unit,
-    onTogglePowerSave: () -> Unit,
     onClockStyleChange: (String) -> Unit,
     onSetupChargingMode: () -> Unit,
     onUpdatePhotoInterval: (Int) -> Unit,
@@ -592,76 +654,89 @@ private fun SettingsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .heightIn(max = 680.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(start = 24.dp, end = 24.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text("StandBy settings", style = MaterialTheme.typography.headlineSmall)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("24-hour clock")
-                Switch(checked = uiState.settings.use24Hour, onCheckedChange = { onToggle24Hour() })
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("Night mode")
-                Switch(checked = uiState.nightMode, onCheckedChange = { onToggleNightMode() })
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("Power save")
-                Switch(checked = uiState.settings.powerSaveMode, onCheckedChange = { onTogglePowerSave() })
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("Keep screen on")
-                Switch(checked = uiState.settings.keepScreenOn, onCheckedChange = { onToggleKeepScreenOn() })
-            }
-            Text(
-                "To start StandBy while charging, enable it as your Android screen saver and choose the charging trigger."
-            )
-            Button(onClick = onSetupChargingMode) { Text("Set up charging screen") }
-            Text("Clock style")
-            Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Settings", style = MaterialTheme.typography.headlineSmall, color = Color(0xFFF3F1F7))
+            Text("Make your bedside display feel right.", color = MutedText, fontSize = 14.sp)
+            SettingsSwitchRow("24-hour time", uiState.settings.use24Hour, onToggle24Hour)
+            SettingsSwitchRow("Night colors", uiState.nightMode, onToggleNightMode)
+            SettingsSwitchRow("Keep screen on in app", uiState.settings.keepScreenOn, onToggleKeepScreenOn)
+
+            Text("Clock style", color = Color(0xFFF3F1F7), fontWeight = FontWeight.Medium)
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 listOf("digital", "analog", "split").forEach { style ->
-                    Button(onClick = { onClockStyleChange(style) }) {
-                        Text(style.replaceFirstChar { it.uppercase() })
-                    }
+                    FilterChip(
+                        selected = uiState.settings.clockStyle == style,
+                        onClick = { onClockStyleChange(style) },
+                        label = { Text(style.replaceFirstChar { it.uppercase() }) }
+                    )
                 }
             }
-            Text("Photo interval: ${uiState.settings.photoIntervalSeconds}s")
-            Slider(
-                value = uiState.settings.photoIntervalSeconds.toFloat(),
-                onValueChange = { onUpdatePhotoInterval(it.toInt()) },
-                valueRange = 4f..20f,
-                steps = 15
+
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Photo interval", color = Color(0xFFF3F1F7), fontWeight = FontWeight.Medium)
+                Text("Change photos every ${uiState.settings.photoIntervalSeconds} seconds", color = MutedText, fontSize = 12.sp)
+                Slider(
+                    value = uiState.settings.photoIntervalSeconds.toFloat(),
+                    onValueChange = { onUpdatePhotoInterval(it.toInt()) },
+                    valueRange = 4f..20f,
+                    steps = 15
+                )
+            }
+
+            Button(onClick = onSetupChargingMode, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.BatteryChargingFull, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Set up charging screen")
+            }
+            Button(onClick = onRequestCalendarPermission, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Event, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Enable calendar events")
+            }
+            Text(
+                "Android starts the screen saver when your phone is idle; it may not appear as soon as you plug in.",
+                color = MutedText,
+                fontSize = 12.sp
             )
-            Button(onClick = onRequestCalendarPermission) { Text("Grant calendar access") }
         }
     }
 }
 
 @Composable
-private fun IconButtonWithLabel(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onClick() }) {
-        Surface(shape = CircleShape, color = Color(0xFF0F1B28), modifier = Modifier.size(42.dp)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = label, tint = Color.White)
-            }
-        }
-        Text(label, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+private fun SettingsSwitchRow(label: String, checked: Boolean, onCheckedChange: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, color = Color(0xFFE9E7EF), fontSize = 14.sp)
+        Switch(checked = checked, onCheckedChange = { onCheckedChange() })
     }
 }
 
-private fun formatTime(time: java.time.LocalDateTime, use24Hour: Boolean): String {
-    val pattern = if (use24Hour) "HH:mm" else "hh:mm a"
-    return time.format(DateTimeFormatter.ofPattern(pattern))
+private fun formatTime(time: LocalDateTime, use24Hour: Boolean): String {
+    val pattern = if (use24Hour) "HH:mm" else "h:mm"
+    return time.format(DateTimeFormatter.ofPattern(pattern, Locale.getDefault()))
 }
 
-private fun formatDate(date: LocalDate): String {
-    return date.format(DateTimeFormatter.ofPattern("EEEE, d MMMM"))
-}
+private fun formatDate(date: LocalDate): String =
+    date.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()))
 
-private fun chargingStateLabel(state: Int): String {
-    return when (state) {
-        BatteryManager.BATTERY_STATUS_CHARGING -> "Charging"
-        BatteryManager.BATTERY_STATUS_FULL -> "Full"
-        BatteryManager.BATTERY_STATUS_DISCHARGING -> "Discharging"
-        else -> "Unknown"
-    }
+private fun formatEventTime(timeMillis: Long): String =
+    java.time.Instant.ofEpochMilli(timeMillis)
+        .atZone(java.time.ZoneId.systemDefault())
+        .format(DateTimeFormatter.ofPattern("EEE, d MMM · HH:mm", Locale.getDefault()))
+
+private fun chargingStateLabel(state: Int): String = when (state) {
+    BatteryManager.BATTERY_STATUS_CHARGING -> "Charging"
+    BatteryManager.BATTERY_STATUS_FULL -> "Fully charged"
+    BatteryManager.BATTERY_STATUS_DISCHARGING -> "Not charging"
+    else -> "Battery status unavailable"
 }

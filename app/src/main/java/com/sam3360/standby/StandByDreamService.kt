@@ -5,11 +5,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.ColorDrawable
 import android.os.BatteryManager
 import android.service.dreams.DreamService
 import android.view.Gravity
 import android.view.View
+import android.graphics.Canvas
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -28,6 +31,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import java.time.format.DateTimeFormatter
 
 class StandByDreamService : DreamService(), ViewModelStoreOwner {
@@ -37,10 +41,12 @@ class StandByDreamService : DreamService(), ViewModelStoreOwner {
     private val imageLoader by imageLoaderDelegate
     private lateinit var viewModel: StandByViewModel
     private lateinit var clockView: TextView
+    private lateinit var analogClockView: DreamAnalogClockView
     private lateinit var dateView: TextView
     private lateinit var batteryView: TextView
     private lateinit var photoView: ImageView
     private lateinit var emptyPhotoView: TextView
+    private var displayJob: Job? = null
     private var displayedPhoto: android.net.Uri? = null
     private var batteryReceiverRegistered = false
 
@@ -67,27 +73,34 @@ class StandByDreamService : DreamService(), ViewModelStoreOwner {
 
         isInteractive = true
         isFullscreen = true
+        isScreenBright = false
         setContentView(createDreamView())
-        serviceScope.launch {
-            viewModel.uiState.collect(::renderState)
-        }
     }
 
     override fun onDreamingStarted() {
         super.onDreamingStarted()
-        val stickyBatteryIntent = ContextCompat.registerReceiver(
-            this,
-            batteryReceiver,
-            IntentFilter(Intent.ACTION_BATTERY_CHANGED),
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-        batteryReceiverRegistered = true
-        stickyBatteryIntent?.let(::updateBattery)
+        if (displayJob?.isActive != true) {
+            displayJob = serviceScope.launch {
+                viewModel.uiState.collect(::renderState)
+            }
+        }
+        if (!batteryReceiverRegistered) {
+            val stickyBatteryIntent = ContextCompat.registerReceiver(
+                this,
+                batteryReceiver,
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            batteryReceiverRegistered = true
+            stickyBatteryIntent?.let(::updateBattery)
+        }
         viewModel.loadCalendarEvents(this)
     }
 
     override fun onDreamingStopped() {
         unregisterBatteryReceiver()
+        displayJob?.cancel()
+        displayJob = null
         super.onDreamingStopped()
     }
 
@@ -127,11 +140,28 @@ class StandByDreamService : DreamService(), ViewModelStoreOwner {
             layoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         )
         clockView = textView("", if (landscape) 82f else 68f, Color.rgb(244, 241, 250))
+        analogClockView = DreamAnalogClockView(this).apply {
+            visibility = View.GONE
+        }
+        val clockDisplay = FrameLayout(this).apply {
+            addView(
+                clockView,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER_VERTICAL or if (landscape) Gravity.START else Gravity.CENTER_HORIZONTAL
+                )
+            )
+            addView(
+                analogClockView,
+                FrameLayout.LayoutParams(dp(if (landscape) 150 else 176), dp(if (landscape) 150 else 176))
+            )
+        }
         clockPanel.addView(
-            clockView,
+            clockDisplay,
             layoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(if (landscape) 160 else 184),
                 top = if (landscape) 18 else 10
             )
         )
@@ -202,12 +232,27 @@ class StandByDreamService : DreamService(), ViewModelStoreOwner {
     }
 
     private fun renderState(state: StandByUiState) {
-        val accent = if (state.nightMode) Color.rgb(255, 119, 125) else Color.rgb(213, 201, 255)
-        clockView.text = state.currentTime.format(
-            DateTimeFormatter.ofPattern(if (state.settings.use24Hour) "HH:mm" else "hh:mm a")
-        )
+        val accent = if (state.nightMode) Color.rgb(255, 154, 139) else Color.rgb(201, 185, 255)
+        clockView.text = when (state.settings.clockStyle) {
+            "split" -> state.currentTime.format(DateTimeFormatter.ofPattern("HH  mm"))
+            else -> state.currentTime.format(
+                DateTimeFormatter.ofPattern(if (state.settings.use24Hour) "HH:mm" else "h:mm a")
+            )
+        }
+        clockView.typeface = if (state.settings.clockStyle == "split") {
+            android.graphics.Typeface.create("monospace", android.graphics.Typeface.NORMAL)
+        } else {
+            android.graphics.Typeface.create("sans-serif-light", android.graphics.Typeface.NORMAL)
+        }
+        clockView.visibility = if (state.settings.clockStyle == "analog") View.GONE else View.VISIBLE
+        analogClockView.visibility = if (state.settings.clockStyle == "analog") View.VISIBLE else View.GONE
+        analogClockView.setClock(state.currentTime, accent)
         dateView.text = state.currentDate.format(DateTimeFormatter.ofPattern("EEEE, d MMMM"))
-        batteryView.text = "${state.batteryLevel}%  ${chargingStateLabel(state.chargingState)}"
+        batteryView.text = getString(
+            R.string.battery_summary,
+            state.batteryLevel,
+            chargingStateLabel(state.chargingState)
+        )
         batteryView.setTextColor(accent)
 
         val photo = state.selectedPhotos.getOrNull(state.settings.photoIndex)
@@ -220,6 +265,8 @@ class StandByDreamService : DreamService(), ViewModelStoreOwner {
                 imageLoader.enqueue(
                     ImageRequest.Builder(this)
                         .data(it)
+                        .placeholder(ColorDrawable(Color.rgb(16, 17, 22)))
+                        .error(ColorDrawable(Color.rgb(16, 17, 22)))
                         .target(photoView)
                         .build()
                 )
@@ -232,6 +279,82 @@ class StandByDreamService : DreamService(), ViewModelStoreOwner {
         val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
         val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
         viewModel.updateBattery(level, scale, status)
+    }
+
+    private class DreamAnalogClockView(context: Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private var time = java.time.LocalDateTime.now()
+        private var accent = Color.rgb(201, 185, 255)
+
+        fun setClock(time: java.time.LocalDateTime, accent: Int) {
+            this.time = time
+            this.accent = accent
+            invalidate()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val cx = width / 2f
+            val cy = height / 2f
+            val radius = minOf(width, height) * 0.46f
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = minOf(width, height) * 0.012f
+            paint.color = Color.rgb(48, 47, 57)
+            canvas.drawCircle(cx, cy, radius, paint)
+
+            for (index in 0 until 60) {
+                val angle = Math.toRadians(index * 6.0 - 90.0)
+                val major = index % 5 == 0
+                val innerRadius = radius * if (major) 0.86f else 0.93f
+                paint.color = if (major) accent else Color.rgb(100, 98, 110)
+                paint.strokeWidth = minOf(width, height) * if (major) 0.014f else 0.006f
+                canvas.drawLine(
+                    cx + (kotlin.math.cos(angle) * innerRadius).toFloat(),
+                    cy + (kotlin.math.sin(angle) * innerRadius).toFloat(),
+                    cx + (kotlin.math.cos(angle) * radius).toFloat(),
+                    cy + (kotlin.math.sin(angle) * radius).toFloat(),
+                    paint
+                )
+            }
+
+            val minuteValue = time.minute + time.second / 60f
+            drawHand(
+                canvas,
+                cx,
+                cy,
+                radius * 0.52f,
+                time.hour % 12 / 12f + minuteValue / 720f,
+                accent,
+                radius * 0.055f
+            )
+            drawHand(canvas, cx, cy, radius * 0.74f, minuteValue / 60f, Color.WHITE, radius * 0.035f)
+            paint.style = Paint.Style.FILL
+            paint.color = accent
+            canvas.drawCircle(cx, cy, radius * 0.06f, paint)
+        }
+
+        private fun drawHand(
+            canvas: Canvas,
+            cx: Float,
+            cy: Float,
+            length: Float,
+            fraction: Float,
+            color: Int,
+            strokeWidth: Float
+        ) {
+            val angle = Math.toRadians(fraction * 360.0 - 90.0)
+            paint.style = Paint.Style.STROKE
+            paint.strokeCap = Paint.Cap.ROUND
+            paint.strokeWidth = strokeWidth
+            paint.color = color
+            canvas.drawLine(
+                cx,
+                cy,
+                cx + (kotlin.math.cos(angle) * length).toFloat(),
+                cy + (kotlin.math.sin(angle) * length).toFloat(),
+                paint
+            )
+        }
     }
 
     private fun unregisterBatteryReceiver() {

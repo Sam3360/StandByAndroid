@@ -1,10 +1,10 @@
 package com.sam3360.standby
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.ActivityNotFoundException
 import android.content.pm.PackageManager
 import android.os.BatteryManager
 import android.os.Bundle
@@ -21,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.sam3360.standby.data.SettingsRepository
 import com.sam3360.standby.ui.StandByScreen
 import com.sam3360.standby.ui.theme.StandByTheme
 
@@ -64,7 +63,6 @@ class MainActivity : ComponentActivity() {
                         uiState = state,
                         onToggleSettings = { viewModel.toggleSettings() },
                         onToggleNightMode = { viewModel.toggleNightMode() },
-                        onTogglePowerSave = { viewModel.togglePowerSave() },
                         onClockStyleChange = { viewModel.updateClockStyle(it) },
                         onToggle24Hour = { viewModel.update24Hour(!state.settings.use24Hour) },
                         onRequestCalendarPermission = {
@@ -78,7 +76,29 @@ class MainActivity : ComponentActivity() {
                                 calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR)
                             }
                         },
-                        onPhotoPick = { uris -> viewModel.setPhotoSelection(uris) },
+                        onPhotoPick = { uris ->
+                            val persistedUris = uris.filter { uri ->
+                                try {
+                                    contentResolver.takePersistableUriPermission(
+                                        uri,
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                    )
+                                    true
+                                } catch (_: SecurityException) {
+                                    false
+                                }
+                            }
+                            if (persistedUris.isNotEmpty()) {
+                                viewModel.setPhotoSelection(persistedUris)
+                            }
+                            if (persistedUris.size != uris.size) {
+                                Toast.makeText(
+                                    this,
+                                    "Some photos could not be saved for the screen saver.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        },
                         onNextPhoto = { viewModel.nextPhoto() },
                         onPreviousPhoto = { viewModel.previousPhoto() },
                         onSetupChargingMode = ::openDreamSettings,
@@ -95,7 +115,12 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         if (!batteryReceiverRegistered) {
-            registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            ContextCompat.registerReceiver(
+                this,
+                batteryReceiver,
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
             batteryReceiverRegistered = true
         }
     }

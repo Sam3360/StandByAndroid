@@ -26,7 +26,11 @@ object StandByLogic {
     }
 
     fun batteryPercent(level: Int, scale: Int): Int {
-        return if (level > -1 && scale > 0) (level * 100f / scale).toInt() else 0
+        return if (level > -1 && scale > 0) {
+            (level * 100f / scale).toInt().coerceIn(0, 100)
+        } else {
+            0
+        }
     }
 
     fun nextIndex(current: Int, size: Int): Int {

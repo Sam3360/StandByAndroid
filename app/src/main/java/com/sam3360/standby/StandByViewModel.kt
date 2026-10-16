@@ -109,12 +109,6 @@ class StandByViewModel(
         }
     }
 
-    fun togglePowerSave() {
-        viewModelScope.launch {
-            settingsRepository.updateSettings { it.copy(powerSaveMode = !it.powerSaveMode) }
-        }
-    }
-
     fun updateClockStyle(style: String) {
         viewModelScope.launch {
             settingsRepository.updateSettings { it.copy(clockStyle = style) }
@@ -142,9 +136,8 @@ class StandByViewModel(
     }
 
     fun updateBattery(level: Int, scale: Int, status: Int) {
-        val pct = if (level > -1 && scale > 0) (level * 100f / scale).toInt() else 0
         batteryFlow.value = StandByBatteryState(
-            level = pct,
+            level = StandByLogic.batteryPercent(level, scale),
             chargingState = status
         )
     }

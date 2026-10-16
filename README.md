@@ -9,7 +9,7 @@ Turn your Android phone into a bedside display with clocks, battery status, upco
 3. Open the downloaded APK and follow Android's installation prompts.
 4. If Android asks, allow your browser or file manager to install unknown apps, then return to the APK and continue.
 
-StandBy requires Android 8.0 (API 26) or newer. Calendar events are optional; grant calendar access in the app only if you want to show them. Photos are selected using Android's system photo picker.
+StandBy requires Android 8.0 (API 26) or newer. Calendar events are optional; grant calendar access in the app only if you want to show them. Photos are selected through Android's document picker, and access is saved so the slideshow can keep showing them later.
 
 ### About preview builds
 
